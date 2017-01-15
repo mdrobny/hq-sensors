@@ -1,29 +1,25 @@
 const co = require('co');
 
-const redis = require('../../redis');
+const { CPU } = require('../../config/const');
 
 const getCurrentCpuUsage = require('./getCurrentCpuUsage');
 
-const { CPU } = require('../../config/const');
+function cpuTickWrap(redis) {
+    return () => co(function* cpuTick() {
+        const date = new Date();
 
-function cpuTick() {
-	return co(function* () {
-		const date = new Date();
+        const cpuUsage = yield getCurrentCpuUsage();
 
-		const cpuUsage = yield getCurrentCpuUsage();
+        const data = JSON.stringify({
+            datetime: date.toISOString(),
+            cpuUsage
+        });
 
-		const data = JSON.stringify({
-			datetime: date.toISOString(),
-			cpuUsage
-		});
+        // Use timestamp as a sorted set selector
+        const timestamp = date.getTime();
 
-		// Use timestamp as a sorted set selector
-		const timestamp = date.getTime();
-
-		console.log('cpu', date.toISOString());
-
-		yield redis.zadd(CPU.SET_NAME, timestamp, data);
-	});
+        yield redis.zadd(CPU.SET_NAME, timestamp, data);
+    });
 }
 
-module.exports = cpuTick;
+module.exports = cpuTickWrap;
